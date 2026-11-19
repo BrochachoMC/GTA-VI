@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Player em sequência</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: #111;
+    color: #eee;
+    font-family: system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 16px;
+  }
+  video {
+    width: 100%;
+    max-width: 960px;
+    background: #000;
+    border-radius: 8px;
+  }
+  .info { font-size: 14px; opacity: .8; }
+  .lista { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  button {
+    background: #2a2a2a;
+    color: #eee;
+    border: 1px solid #444;
+    border-radius: 6px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  button.ativo { background: #2563eb; border-color: #2563eb; }
+  button:hover { filter: brightness(1.2); }
+</style>
+</head>
+<body>
+  <video id="player" controls autoplay playsinline></video>
+  <div class="info" id="info"></div>
+  <div class="lista" id="lista"></div>
+
+<script>
+  const videos = ["1.mp4", "2.mp4", "3.mp4", "4.mp4"];
+  let atual = 0;
+
+  const player = document.getElementById("player");
+  const info = document.getElementById("info");
+  const lista = document.getElementById("lista");
+
+  videos.forEach((nome, i) => {
+    const b = document.createElement("button");
+    b.textContent = "Vídeo " + (i + 1);
+    b.onclick = () => tocar(i);
+    lista.appendChild(b);
+  });
+
+  function tocar(i) {
+    atual = i;
+    player.src = videos[i];
+    player.play().catch(() => {});
+    info.textContent = "Tocando " + (i + 1) + " de " + videos.length + " (" + videos[i] + ")";
+    [...lista.children].forEach((b, idx) => b.classList.toggle("ativo", idx === i));
+  }
+
+  player.addEventListener("ended", () => {
+    if (atual < videos.length - 1) {
+      tocar(atual + 1);
+    } else {
+      info.textContent = "Fim da sequência";
+    }
+  });
+
+  player.addEventListener("error", () => {
+    info.textContent = "Não foi possível carregar " + videos[atual];
+  });
+
+  tocar(0);
+</script>
+</body>
+</html>
