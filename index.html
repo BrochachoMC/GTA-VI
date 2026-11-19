@@ -3,84 +3,177 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Player em sequência</title>
+<title>GTA VI</title>
 <style>
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    min-height: 100vh;
-    background: #111;
-    color: #eee;
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    background: #000;
+    overflow: hidden;
     font-family: system-ui, sans-serif;
+  }
+  #menu {
+    position: fixed;
+    inset: 0;
+    background: #000;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 16px;
-    padding: 16px;
+    gap: 18px;
+    z-index: 10;
   }
-  video {
-    width: 100%;
-    max-width: 960px;
-    background: #000;
-    border-radius: 8px;
-  }
-  .info { font-size: 14px; opacity: .8; }
-  .lista { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
-  button {
-    background: #2a2a2a;
-    color: #eee;
-    border: 1px solid #444;
-    border-radius: 6px;
-    padding: 8px 14px;
+  #menu button {
+    width: 240px;
+    padding: 14px 0;
+    background: transparent;
+    color: #fff;
+    border: 1px solid #fff;
+    font-size: 18px;
+    letter-spacing: 2px;
     cursor: pointer;
-    font-size: 14px;
+    transition: background .2s, color .2s;
   }
-  button.ativo { background: #2563eb; border-color: #2563eb; }
-  button:hover { filter: brightness(1.2); }
+  #menu button:hover { background: #fff; color: #000; }
+  #stage {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    cursor: none;
+  }
+  #stage video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+    z-index: 1;
+  }
+  #stage video.on { z-index: 2; }
+  .oculto { display: none !important; }
 </style>
 </head>
 <body>
-  <video id="player" controls autoplay playsinline></video>
-  <div class="info" id="info"></div>
-  <div class="lista" id="lista"></div>
+
+<div id="menu">
+  <button id="btnIniciar">Iniciar GTA VI</button>
+  <button id="btnFull">Full Screen</button>
+</div>
+
+<div id="stage" class="oculto">
+  <video id="v0" preload="auto" playsinline></video>
+  <video id="v1" preload="auto" playsinline></video>
+</div>
 
 <script>
   const videos = ["1.mp4", "2.mp4", "3.mp4", "4.mp4"];
-  let atual = 0;
+  const MARGEM = 0.06; // segundos antes do fim para trocar de vídeo
 
-  const player = document.getElementById("player");
-  const info = document.getElementById("info");
-  const lista = document.getElementById("lista");
+  const menu = document.getElementById("menu");
+  const stage = document.getElementById("stage");
+  const slots = [document.getElementById("v0"), document.getElementById("v1")];
 
-  videos.forEach((nome, i) => {
-    const b = document.createElement("button");
-    b.textContent = "Vídeo " + (i + 1);
-    b.onclick = () => tocar(i);
-    lista.appendChild(b);
-  });
+  let atual = 0;      // índice do vídeo em reprodução
+  let slot = 0;       // qual <video> está ativo
+  let trocando = false;
+  let rodando = false;
 
-  function tocar(i) {
-    atual = i;
-    player.src = videos[i];
-    player.play().catch(() => {});
-    info.textContent = "Tocando " + (i + 1) + " de " + videos.length + " (" + videos[i] + ")";
-    [...lista.children].forEach((b, idx) => b.classList.toggle("ativo", idx === i));
+  function carregar(el, i) {
+    if (i < videos.length) {
+      el.src = videos[i];
+      el.load();
+    } else {
+      el.removeAttribute("src");
+      el.load();
+    }
   }
 
-  player.addEventListener("ended", () => {
-    if (atual < videos.length - 1) {
-      tocar(atual + 1);
-    } else {
-      info.textContent = "Fim da sequência";
+  function trocar() {
+    if (trocando) return;
+    trocando = true;
+
+    const velho = slots[slot];
+    const proximoIdx = atual + 1;
+
+    if (proximoIdx >= videos.length) {
+      // fim da sequência
+      velho.addEventListener("ended", encerrar, { once: true });
+      if (velho.ended) encerrar();
+      return;
     }
+
+    const novoSlot = 1 - slot;
+    const novo = slots[novoSlot];
+    novo.currentTime = 0;
+    novo.classList.add("on");
+    novo.play().catch(() => {});
+
+    setTimeout(() => {
+      velho.classList.remove("on");
+      velho.pause();
+      carregar(velho, proximoIdx + 1); // pré-carrega o seguinte
+    }, 200);
+
+    slot = novoSlot;
+    atual = proximoIdx;
+    trocando = false;
+  }
+
+  function vigiar() {
+    if (!rodando) return;
+    const v = slots[slot];
+    if (v.duration && !trocando && v.duration - v.currentTime <= MARGEM) {
+      trocar();
+    }
+    requestAnimationFrame(vigiar);
+  }
+
+  function encerrar() {
+    rodando = false;
+    trocando = false;
+    slots.forEach(v => { v.pause(); v.classList.remove("on"); });
+    stage.classList.add("oculto");
+    menu.classList.remove("oculto");
+    if (document.fullscreenElement) document.exitFullscreen();
+  }
+
+  function iniciar() {
+    atual = 0;
+    slot = 0;
+    trocando = false;
+    rodando = true;
+
+    carregar(slots[0], 0);
+    carregar(slots[1], 1);
+    slots[0].classList.add("on");
+    slots[1].classList.remove("on");
+
+    menu.classList.add("oculto");
+    stage.classList.remove("oculto");
+
+    slots[0].play().catch(() => {});
+    requestAnimationFrame(vigiar);
+  }
+
+  // Fallback caso a aba fique em segundo plano (rAF pausa)
+  slots.forEach((v, i) => {
+    v.addEventListener("ended", () => {
+      if (rodando && i === slot) trocar();
+    });
   });
 
-  player.addEventListener("error", () => {
-    info.textContent = "Não foi possível carregar " + videos[atual];
-  });
+  function alternarFullscreen() {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  }
 
-  tocar(0);
+  document.getElementById("btnIniciar").onclick = iniciar;
+  document.getElementById("btnFull").onclick = alternarFullscreen;
 </script>
 </body>
 </html>
